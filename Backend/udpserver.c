@@ -6,7 +6,7 @@
    Nombre Archivo: udpserver.c   
    Fecha: Febrero 2023
 
-   Compilacion: cc udpserver.c cJSON.c -lnsl -o udpserver
+   Compilacion: cc udpserver.c cJSON.c SHA256.c -lnsl -o udpserver
    Ejecución: ./udpserver
 
 */
@@ -114,6 +114,17 @@ void readJsonFile(char *archivo, char *inst,char *user,char *email,char *passwor
 	
 	
 	
+}
+char *SHA256( char* message){
+	BYTE buf[SHA256_BLOCK_SIZE];
+	SHA256_CTX ctx;
+	sha256_init(&ctx);
+	sha256_update(&ctx, message, strlen(message));
+	sha256_final(&ctx, buf);
+	char sal[SHA256_BLOCK_SIZE];
+	for( int i=0; i<SHA256_BLOCK_SIZE; i++){
+		sal[i]=buf[i];
+	}
 }
   
 // Driver code 

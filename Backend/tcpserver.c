@@ -34,6 +34,7 @@
 #define  msgSIZE   2048      /* longitud maxima parametro entrada/salida */
 #define  PUERTO    5003	     /* numero puerto arbitrario */
 #define MAXLINE 1000 
+#define HASHKEY 1
 
 int                  sd, sd_actual, sd_actual2;  /* descriptores de sockets */
 int                  addrlen;        /* longitud msgecciones */
@@ -104,51 +105,7 @@ int isNumberl(const char *str) {
 }
 
 void readJsonFile(char *archivo, char *inst, int *id, int *fila, int *col){
-	/*
-	char izq[100], der[100];
-	strcpy(izq,"");
-	strcpy(der,"");
-	int it=0,ap=0, lookl=0;
-	*id=0;
-	*fila=0;
-	*col=0;
-	while(archivo[it]!='\0'){
-		if(archivo[it]=='\"'){
-			if(ap==0){
-				ap=1;
-				if(lookl==0){
-					strcpy(izq,"");
-				} else{
-					strcpy(der,"");
-				}
-			} else{
-				ap=0;
-			}
-		}
-		if(ap==1){
-			
-				if(lookl==0){
-					strcat(izq,&archivo[it]);
-				} else{
-					strcat(der,&archivo[it]);
-				}
-		}else{
-			if(archivo[it]==':'){
-				lookl=1;
-			}else{
-				if(archivo[it]!=','){
-					if(strcmp(izq,"inst")==0)strcpy(inst,der);
-					if(strcmp(izq,"id")==0&&isNumber(der))*id=atoi(der);
-					if(strcmp(izq,"fila")==0&&isNumber(der))*fila=atoi(der);
-					if(strcmp(izq,"columna")==0&&isNumber(der))*col=atoi(der);
-					lookl=0;
-					strcpy(der,"");
-					strcpy(izq,"");
-				}
-			}
-		}
-		it++;
-	}*/
+	
 	cJSON* json = cJSON_Parse(archivo);
 	printf("Archivo Parseado\n");
     if (json == NULL) {
@@ -215,57 +172,6 @@ void readJsonFile(char *archivo, char *inst, int *id, int *fila, int *col){
 	
 }
 
-  	
-int won(int tablero[7][7]){
-	for( int i=0; i<7; i++){
-		for( int k=0; k<7; k++){
-			printf("%d ", tablero[i][k]);
-		}
-			printf("\n");
-	}
-	for( int i=0; i<7; i++){
-		for( int k=0; k<4; k++){
-			if(tablero[i][k]!=0)
-			if(tablero[i][k]==tablero[i][k+1]&&tablero[i][k]==tablero[i][k+2]&&tablero[i][k]==tablero[i][k+3]&&tablero[i][k]!=0)return 1;
-		}
-	}
-	printf("No hay fila iguales\n");
-	for( int i=0; i<7; i++){
-		for( int k=0; k+3<7; k++){
-			if(tablero[k][i]!=0)
-			if(tablero[k][i]==tablero[k+1][i]&&tablero[k][i]==tablero[k+2][i]&&tablero[k][i]==tablero[k+3][i]&&tablero[k][i]!=0)return 1;
-		}
-	}
-	printf("No hay columnas\n");
-
-	for( int i=0; i+3<7; i++){
-		for( int k=0; k+3<7; k++){
-			if(tablero[i][k]!=0)
-			if(tablero[i][k]==tablero[i+1][k+1]&&tablero[i][k]==tablero[i+2][k+2]&&tablero[i][k]==tablero[i+3][k+3])return 1;
-		}
-	}
-		
-	for( int i=6; i-3>=0; i--){
-		for( int k=0; k+3<7; k++){
-			if(tablero[i][k]!=0)
-			if(tablero[i][k]==tablero[i-1][k+1]&&tablero[i][k]==tablero[i-2][k+2]&&tablero[i][k]==tablero[i-3][k+3])return 1;
-		}
-	}
-	for( int i=6; i-3>=0; i--){
-		for( int k=6; k-3>=0; k--){
-			if(tablero[i][k]!=0)
-			if(tablero[i][k]==tablero[i-1][k-1]&&tablero[i][k]==tablero[i-2][k-2]&&tablero[i][k]==tablero[i-3][k-3])return 1;
-		}
-	}
-	for( int i=0; i+3<7; i++){
-		for( int k=6; k-3>=0; k--){
-			if(tablero[i][k]!=0)
-			if(tablero[i][k]==tablero[i+1][k-1]&&tablero[i][k]==tablero[i+2][k-2]&&tablero[i][k]==tablero[i+3][k-3])return 1;
-		}
-	}
-	printf("No hay diagonal2 \n");
-	return 0;
-}
 
 /*
 	Nota Isaac, es muy importante que modifiques la IP y el puerto para los del servidor UDP
@@ -321,17 +227,15 @@ int udp(char *message, int intencion)
     return ans;
 } 
 
-
-
 void descifrar( char* mensaje){
     while (*str != '\0') {
-        *str = *str - 1;
+        *str = *str - HASHKEY;
         str++;
     }
 }
 void cifrar( char* mensaje){
     while (*str != '\0') {
-        *str = *str + 1;
+        *str = *str + HASHKEY;
         str++;
     }
 }
@@ -340,7 +244,6 @@ void cifrar( char* mensaje){
 int main(){
 	char  msg[msgSIZE];	     /* parametro entrada y salida */
 	char  json[jsonSIZE];	     /* parametro entrada y salida */
-	int tablero[7][7];
 	/*
 	When the user presses <Ctrl + C>, the aborta_handler function will be called, 
 	and such a message will be printed. 
@@ -384,21 +287,13 @@ int main(){
 			perror("accept");
 			exit(1);
 		}
-		printf("Conexion 1 establecida\n");
-		if ((sd_actual2 = accept(sd, (struct sockaddr *)&pin, &addrlen)) == -1) {
-			perror("accept");
-			exit(1);
-		}
 		printf("Conexiones establecidas\n");
 		pid_t child_pid;
 		child_pid=fork();
 		
 		if(child_pid!=0){
-			for( int i=0; i<7;i++){
-				for( int j=0; j<7; j++){
-					tablero[i][j]=0;
-				}
-			}
+			
+	 		int messages_sent=0, messages_recieved=0;
 			printf("sd_Actual: %d\n",(int)sd_actual );
 			char sigue='S';
 			char msgReceived[1000];
@@ -409,26 +304,16 @@ int main(){
 			strcpy(json,"");
 			int logina=0, loginb=0;
 			while(sigue=='S'){	
-				idc=0;
-				fil=0; 
-				col=0;			
+				idc=0;		
 				/* tomar un mensaje del cliente */
-				int n;
-				if(turno ==0){			
-					n = recv(sd_actual, msg, sizeof(msg), 0);
-					if(logina==1)turno=1;
-				}
-				else{			
-					n = recv(sd_actual2, msg, sizeof(msg), 0);
-					if(loginb==1)turno=0;
-				}
+				int n;		
+				n = recv(sd_actual, msg, sizeof(msg), 0);
 				if (n == -1) {
 					perror("recv");
 					exit(1);
 				}		
 				msg[n] = '\0';
 				descifrar(msg);		
-				printf("Client %d sent: %s\n", 1-turno, msg);
 				strcpy(json,msg);
 				readJsonFile(json, inst, &idc, &fil, &col);
 				printf("Instruccion recibida: %s\n", inst);
@@ -444,26 +329,7 @@ int main(){
 						else
 							res=udp(json,1);
 						if(res==1){
-							if(logina==1){
-								loginb=1;
-								nJsonFile(json,"LOGIN_SUCCESSFULL",2,0,0);
-								if (send(sd_actual2, json, strlen(json), 0) == -1) {
-									perror("send");
-									exit(1);
-								}
-								notsendanything=1;
-								turno=0;
-							}
-							else{
-								logina=1;
-								nJsonFile(json,"LOGIN_SUCCESSFULL",1,0,0);
-								if (send(sd_actual, json, strlen(json), 0) == -1) {
-									perror("send");
-									exit(1);
-								}
-								notsendanything=1;
-								turno=1;
-							}
+							nJsonFile(json,"LOGIN_SUCCESSFULL",2,0,0);							
 						} else{
 							if(res==2)
 								nJsonFile(json,"USER_NOT_FOUND",0,0,0);
@@ -473,18 +339,14 @@ int main(){
 								nJsonFile(json,"USER_ALREADY_EXISTS",0,0,0);
 						}
 						printf("Codigo de respuesta recibido %d\n", res);
-					} else{		
-						if(strcmp(inst,"ADD_FICHA")==0){
-							int nfil=6;
-							while(nfil>0&&tablero[col][nfil]!=0)
-								nfil--;
-							fil=nfil;
-							printf("Nueva fila: %d\n",nfil);
-							tablero[col][fil]=idc;
-							if(won(tablero)==1)
-								nJsonFile(json,"GANA",idc,fil,col);
-							else
-								nJsonFile(json,"ADD_FICHA",idc,fil,col);
+					} else{	
+						if(strcmp(inst,"UPD")==0){
+							// Se manda mensaje al servido UDP para que se descarguen los mensajes a este server antes de mandarlos de vuelta al 	
+						} else{
+							if(strcmp(inst,"MSG")==0){
+								int res;
+								res=udp(json,2);
+							}
 						}
 					}
 				}		
@@ -492,44 +354,12 @@ int main(){
 				int sent;
 				if(notsendanything==0){
 					cifrar(json);
-					if(turno ==0){
-						if ( (sent = send(sd_actual, json, strlen(json), 0)) == -1) {
-							perror("send");
-							exit(1);
-						}
-						printf("mensaje enviado a: %s\n", json);
-						if(strcmp(inst,"ADD_FICHA")==0||strcmp(inst,"GANA")==0){
-								
-							if ( (sent = send(sd_actual2, json, strlen(json), 0)) == -1) {
-								perror("send");
-								exit(1);
-							}
-							if(strcmp(inst,"ADD_FICHA")==0){	
-								int temn = recv(sd_actual2, msg, sizeof(msg), 0);
-								temn = recv(sd_actual, msg, sizeof(msg), 0);
-							}
-						printf("mensaje enviado b: %s\n", json);
-						}
-					} else{
-						if ( (sent = send(sd_actual2, json, strlen(json), 0)) == -1) {
-							perror("send");
-							exit(1);
-						}
-						printf("mensaje enviado a: %s\n", json);
-						
-						if(strcmp(inst,"ADD_FICHA")==0||strcmp(inst,"GANA")==0){
-								
-							if ( (sent = send(sd_actual, json, strlen(json), 0)) == -1) {
-								perror("send");
-								exit(1);
-							}	
-							if(strcmp(inst,"ADD_FICHA")==0){		
-								int temn = recv(sd_actual2, msg, sizeof(msg), 0);
-								temn = recv(sd_actual, msg, sizeof(msg), 0);
-							}
-							printf("mensaje enviado b: %s\n", json);
-						}
+					if ( (sent = send(sd_actual, json, strlen(json), 0)) == -1) {
+						perror("send");
+						exit(1);
 					}
+					printf("mensaje enviado a: %s\n", json);
+					
 				}
 				notsendanything=0;
 			}
