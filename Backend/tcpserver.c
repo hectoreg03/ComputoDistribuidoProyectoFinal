@@ -32,7 +32,7 @@
 
 #define  jsonSIZE  10000
 #define  msgSIZE   2048      /* longitud maxima parametro entrada/salida */
-#define  PUERTO    5003	     /* numero puerto arbitrario */
+#define  PUERTO    5000	     /* numero puerto arbitrario */
 #define MAXLINE 1000 
 #define HASHKEY 1
 
@@ -51,7 +51,7 @@ void aborta_handler(int sig){
 }
 
 
-void nJsonFile(char *json,char* inst, int id, int fila, int col){
+void nJsonFile(char *json,char* inst, int id, int fila, char* msg){
 	char ejemplo[1000]="";
 	char nstr[10];
 	strcpy(ejemplo,"{\"inst\":\"");
@@ -62,13 +62,11 @@ void nJsonFile(char *json,char* inst, int id, int fila, int col){
 	strcat(ejemplo," ,\"fila\": ");
 	sprintf(nstr, "%d", fila);
 	strcat(ejemplo,nstr);
-	strcat(ejemplo,",\"columna\": ");
-	sprintf(nstr, "%d", col);
-	strcat(ejemplo,nstr);
+	strcat(ejemplo,",\"msg\": ");
+	strcat(ejemplo,msg);
 	strcat(ejemplo,"}");
 	strcpy(json,ejemplo);
 }
-
 
 void nJsonTurno(char *json,int id){
 	char ejemplo[1000]="";
@@ -104,7 +102,7 @@ int isNumberl(const char *str) {
     return 1; // String can be converted to a number
 }
 
-void readJsonFile(char *archivo, char *inst, int *id, int *fila, int *col){
+void readJsonFile(char *archivo, char *inst, int *id, int *fila, char *col){
 	
 	cJSON* json = cJSON_Parse(archivo);
 	printf("Archivo Parseado\n");
@@ -153,17 +151,17 @@ void readJsonFile(char *archivo, char *inst, int *id, int *fila, int *col){
 		}
 	    
 	    cJSON *columna_obj;
-	    columna_obj = cJSON_GetObjectItemCaseSensitive(json, "columna");
+    	columna_obj = cJSON_GetObjectItemCaseSensitive(json, "msg");
 	    if (columna_obj == NULL ) {
 	        printf("Error: 'columna' not found or not a number.\n");
 	    }else{
-			columnaValue=strdup(columna_obj->valuestring);
-	    	if(isNumberl(columnaValue)==1)
-	    	*col = atoi(columnaValue);
+		    char* colValue = strdup(instJ->valuestring);
+			strcpy(col,colValue);
 		}
 		
 		
 		strcpy(inst,instValue);
+		
 	}
 
     // Clean up
@@ -180,7 +178,7 @@ void readJsonFile(char *archivo, char *inst, int *id, int *fila, int *col){
 int udp(char *message, int intencion)
 {    
     char buffer[1000]; 
-    char ip[16]="10.7.52.136";
+    char ip[16]="172.18.2.4";
     int sockfd; 
     int port=5001;
     struct sockaddr_in servaddr; 
@@ -228,15 +226,15 @@ int udp(char *message, int intencion)
 } 
 
 void descifrar( char* mensaje){
-    while (*str != '\0') {
-        *str = *str - HASHKEY;
-        str++;
+    while (*mensaje != '\0') {
+        *mensaje = *mensaje - HASHKEY;
+        mensaje++;
     }
 }
 void cifrar( char* mensaje){
-    while (*str != '\0') {
-        *str = *str + HASHKEY;
-        str++;
+    while (*mensaje != '\0') {
+        *mensaje = *mensaje + HASHKEY;
+        mensaje++;
     }
 }
 
@@ -281,7 +279,8 @@ int main(){
 	
 	printf("Esperando Conexiones\n"); 
 	/* esperando que un cliente solicite un servicio */
-	while(true){
+	int seguirperman=1;
+	while(seguirperman){
 		
 		if ((sd_actual = accept(sd, (struct sockaddr *)&pin, &addrlen)) == -1) {
 			perror("accept");
@@ -291,16 +290,16 @@ int main(){
 		pid_t child_pid;
 		child_pid=fork();
 		
-		if(child_pid!=0){
-			
+		if(child_pid==0){
 	 		int messages_sent=0, messages_recieved=0;
 			printf("sd_Actual: %d\n",(int)sd_actual );
 			char sigue='S';
 			char msgReceived[1000];
 			char inst[100];
+			char msgCnt[1000];
 			int turno=0;
 			int notsendanything=0;
-			int idc, fil, col;
+			int idc, fil;
 			strcpy(json,"");
 			int logina=0, loginb=0;
 			while(sigue=='S'){	
@@ -315,11 +314,11 @@ int main(){
 				msg[n] = '\0';
 				descifrar(msg);		
 				strcpy(json,msg);
-				readJsonFile(json, inst, &idc, &fil, &col);
+				readJsonFile(json, inst, &idc, &fil, msgCnt);
 				printf("Instruccion recibida: %s\n", inst);
 				if((strcmp(inst,"close")==0)){ //it means that the conversation must be closed
 					sigue='N';
-					nJsonFile(json,inst,idc,fil,col);
+					nJsonFile(json,inst,idc,fil,msgCnt);
 				}else{
 					if(strcmp(inst,"LOGIN")==0||strcmp(inst,"REGISTER")==0){
 						printf("Enviando una request de %s\n",inst);
@@ -329,14 +328,14 @@ int main(){
 						else
 							res=udp(json,1);
 						if(res==1){
-							nJsonFile(json,"LOGIN_SUCCESSFULL",2,0,0);							
+							nJsonFile(json,"LOGIN_SUCCESSFULL",2,0,"");							
 						} else{
 							if(res==2)
-								nJsonFile(json,"USER_NOT_FOUND",0,0,0);
+								nJsonFile(json,"USER_NOT_FOUND",0,0,"");
 							if(res==3)
-								nJsonFile(json,"REGISTER_SUCCESSFULL",0,0,0);
+								nJsonFile(json,"REGISTER_SUCCESSFULL",0,0,"");
 							if(res==4)
-								nJsonFile(json,"USER_ALREADY_EXISTS",0,0,0);
+								nJsonFile(json,"USER_ALREADY_EXISTS",0,0,"");
 						}
 						printf("Codigo de respuesta recibido %d\n", res);
 					} else{	
@@ -346,6 +345,8 @@ int main(){
 							if(strcmp(inst,"MSG")==0){
 								int res;
 								res=udp(json,2);
+							} else{
+								sigue='N';
 							}
 						}
 					}
@@ -368,8 +369,12 @@ int main(){
 					close(sd_actual);  
 				close(sd);
 				printf("Conexion cerrada\n");
+				seguirperman=0;
 				break;
+		} else{
+			close(sd_actual);  
 		}
 	}
+				close(sd);
 	return 0;
 }

@@ -7,7 +7,7 @@
    Fecha: Febrero 2023
 
    Compilacion: cc udpcliente.c -lnsl -o udpcliente
-   Ejecución: ./udpclient
+   Ejecución: ./udpcliente
 */
 // udp client driver program 
 #include <stdio.h> 
@@ -26,19 +26,20 @@
 int main() 
 {    
     char buffer[MAXLINE]; 
-    char ip[16];
+    char ip[]="172.18.2.4";
     char *message = "{   \"inst\":\"REGISTER\",   \"user\":\"usuario1\",   \"email\":\"jhgasdjgf@gmail.com\",   \"password\":\"contra\" }"; 
     //char *message = "{   \"inst\":\"REGISTER\" }"; 
     int sockfd; 
-    int port;
+    int port=5001;
     struct sockaddr_in servaddr; 
       
     // clear servaddr 
     bzero(&servaddr, sizeof(servaddr)); 
+    /*
     printf("Escribe la ip del server: ");
     scanf("%s",ip);
     printf("Escribe el puerto del server: ");
-    scanf("%d",&port);
+    scanf("%d",&port);*/
     servaddr.sin_addr.s_addr = inet_addr(ip); 
     servaddr.sin_port = htons(port); 
     servaddr.sin_family = AF_INET; 
