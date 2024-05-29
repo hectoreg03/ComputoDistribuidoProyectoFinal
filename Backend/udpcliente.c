@@ -26,7 +26,7 @@
 int main() 
 {    
     char buffer[MAXLINE]; 
-    char ip[]="172.18.2.4";
+    char ip[]="172.18.2.2";
     char *message = "{   \"inst\":\"REGISTER\",   \"user\":\"usuario1\",   \"email\":\"jhgasdjgf@gmail.com\",   \"password\":\"contra\" }"; 
     //char *message = "{   \"inst\":\"REGISTER\" }"; 
     int sockfd; 

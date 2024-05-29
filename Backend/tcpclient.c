@@ -12,7 +12,7 @@
 
    Compilacion: cc tcpclient.c cJSON.c -lnsl -o tcpclient
 
-   Ejecucion: ./tcpclient 172.18.2.3    
+   Ejecucion: ./tcpclient 172.18.2.2    
 */
 
 
@@ -42,7 +42,7 @@
 
 #define  jsonSIZE  10000
 #define  msgSIZE   2048      /* longitud maxima parametro entrada/salida */
-#define  PUERTO    5000	     /* numero puerto arbitrario */
+#define  PUERTO    5001	     /* numero puerto arbitrario */
 #define HASHKEY 1
 
 int                  sd, sd_actual;  /* descriptores de sockets */
@@ -92,9 +92,9 @@ void nJsonFile2(char *json,char* inst,char* usr,char* email,char* pass){
 
 
 int isNumberl(const char *str) {
+	printf("Checking if %s is a number\n", str);
     if (!str || *str == '\0') // Null or empty string
         return 0;
-
     char *endptr;
     errno = 0; // To distinguish success/failure after call
     strtol(str, &endptr, 10);
@@ -134,7 +134,8 @@ void readJsonFile(char *archivo, char *inst, int *id, int *fila, char *col){
 	
 	    // Extract the value as a string
 	    char* instValue = strdup(instJ->valuestring);
-	    
+		strcpy(inst,instValue);
+		
 	    char* idValue;
 	    
 	    char* filaValue;
@@ -146,10 +147,12 @@ void readJsonFile(char *archivo, char *inst, int *id, int *fila, char *col){
 	    if (id_obj == NULL ) {
 	        printf("Error: 'id' not found or not a number.\n");
 	    }else{
+	    	printf("Instruccion obtenida correctamente\n");
 			idValue=strdup(id_obj->valuestring);
 	    	if(isNumberl(idValue)==1)
 	    		*id = atoi(idValue);
 		}
+	    
 	    
 	    cJSON *fila_obj;
 	    fila_obj = cJSON_GetObjectItemCaseSensitive(json, "fila");
@@ -160,7 +163,7 @@ void readJsonFile(char *archivo, char *inst, int *id, int *fila, char *col){
 	    	if(isNumberl(filaValue)==1)
 	    		*fila = atoi(filaValue);
 		}
-	    
+		
 	    cJSON *columna_obj;
     	columna_obj = cJSON_GetObjectItemCaseSensitive(json, "msg");
 	    if (columna_obj == NULL ) {
@@ -169,9 +172,6 @@ void readJsonFile(char *archivo, char *inst, int *id, int *fila, char *col){
 		    char* colValue = strdup(instJ->valuestring);
 			strcpy(col,colValue);
 		}
-		
-		
-		strcpy(inst,instValue);
 		
 	}
 
@@ -290,12 +290,14 @@ int main(argc, argv)
 				perror("send");
 				exit(1);
 			}
-		
+			int n;
+			n=recv(sd, dir, sizeof(dir), 0);
 		/* esperar por la respuesta */
-			if ( recv(sd, dir, sizeof(dir), 0) == -1 ) {
+			if (  n== -1 ) {
 				perror("recv");
 				exit(1);
 			}
+			dir[n]='\0';
 			int idc,fil;
 		/* imprimimos el resultado y cerramos la conexion del socket */
 			printf("respuesta cifrada: %s\n", dir);

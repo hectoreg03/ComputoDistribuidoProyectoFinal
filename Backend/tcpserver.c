@@ -32,7 +32,8 @@
 
 #define  jsonSIZE  10000
 #define  msgSIZE   2048      /* longitud maxima parametro entrada/salida */
-#define  PUERTO    5000	     /* numero puerto arbitrario */
+#define  PUERTO    5001	     /* numero puerto arbitrario */
+#define  PUERTOUDP    5000	     /* numero puerto arbitrario */
 #define MAXLINE 1000 
 #define HASHKEY 1
 
@@ -62,9 +63,9 @@ void nJsonFile(char *json,char* inst, int id, int fila, char* msg){
 	strcat(ejemplo," ,\"fila\": ");
 	sprintf(nstr, "%d", fila);
 	strcat(ejemplo,nstr);
-	strcat(ejemplo,",\"msg\": ");
+	strcat(ejemplo,",\"msg\": \"");
 	strcat(ejemplo,msg);
-	strcat(ejemplo,"}");
+	strcat(ejemplo,"\"}\0");
 	strcpy(json,ejemplo);
 }
 
@@ -76,7 +77,7 @@ void nJsonTurno(char *json,int id){
 	strcat(ejemplo,"\",\"id\": ");
 	sprintf(nstr, "%d", id);
 	strcat(ejemplo,nstr);
-	strcat(ejemplo,"}");
+	strcat(ejemplo,"}\0");
 	strcpy(json,ejemplo);
 }
 
@@ -180,7 +181,7 @@ int udp(char *message, int intencion)
     char buffer[1000]; 
     char ip[16]="172.18.2.4";
     int sockfd; 
-    int port=5001;
+    int port=PUERTOUDP;
     struct sockaddr_in servaddr; 
       
     // clear servaddr 
@@ -301,7 +302,8 @@ int main(){
 			int notsendanything=0;
 			int idc, fil;
 			strcpy(json,"");
-			int logina=0, loginb=0;
+			int logina=0;
+			
 			while(sigue=='S'){	
 				idc=0;		
 				/* tomar un mensaje del cliente */
@@ -328,16 +330,17 @@ int main(){
 						else
 							res=udp(json,1);
 						if(res==1){
-							nJsonFile(json,"LOGIN_SUCCESSFULL",2,0,"");							
+							nJsonFile(json,"LOGIN_SUCCESSFULL",2,0,"AC");							
 						} else{
 							if(res==2)
-								nJsonFile(json,"USER_NOT_FOUND",0,0,"");
+								nJsonFile(json,"USER_NOT_FOUND",0,0,"NF");
 							if(res==3)
-								nJsonFile(json,"REGISTER_SUCCESSFULL",0,0,"");
+								nJsonFile(json,"REGISTER_SUCCESSFULL",0,0,"AC");
 							if(res==4)
-								nJsonFile(json,"USER_ALREADY_EXISTS",0,0,"");
+								nJsonFile(json,"USER_ALREADY_EXISTS",0,0,"UE");
 						}
 						printf("Codigo de respuesta recibido %d\n", res);
+						printf("JSON generado: %s\n", json);
 					} else{	
 						if(strcmp(inst,"UPD")==0){
 							// Se manda mensaje al servido UDP para que se descarguen los mensajes a este server antes de mandarlos de vuelta al 	
@@ -354,12 +357,13 @@ int main(){
 				/* enviando la respuesta del servicio */
 				int sent;
 				if(notsendanything==0){
+					printf("mensaje previo a cifrar: %s\n", json);
 					cifrar(json);
+					printf("mensaje enviado a: %s\n", json);
 					if ( (sent = send(sd_actual, json, strlen(json), 0)) == -1) {
 						perror("send");
 						exit(1);
 					}
-					printf("mensaje enviado a: %s\n", json);
 					
 				}
 				notsendanything=0;
@@ -372,6 +376,7 @@ int main(){
 				seguirperman=0;
 				break;
 		} else{
+			printf("Puerto Cerrado\n");
 			close(sd_actual);  
 		}
 	}

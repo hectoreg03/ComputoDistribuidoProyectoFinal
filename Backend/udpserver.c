@@ -23,7 +23,7 @@
 #include "cJSON.h"
 #include "SHA256.h"
 
-#define PORT 5001 
+#define PORT 5000 
 #define MAXLINE 1000 
 #define Key 1
 
@@ -203,7 +203,7 @@ int registerUser(char* user, char* email, char * password, struct User *users, i
     printf("Registering User\n");
     strcpy(users[*userCount].username,user);
     strcpy(users[*userCount].email,email);
-    char *hashpass=  SHA256(password);
+    //char *hashpass=  SHA256(password);
     strcpy( users[*userCount].password,password);
 
     printf("User registered successfully.\n");
@@ -213,9 +213,9 @@ int registerUser(char* user, char* email, char * password, struct User *users, i
 
 // Function to login a user
 int loginUser(char* user, char* email, char * password, struct User *users, int *userCount) {
-    char *hashpass=  SHA256(password);
+    //char *hashpass=  SHA256(password);
     for (int i = 0; i < *userCount; i++) {
-        if (strcmp(users[i].username, user) == 0 && strcmp(users[i].password, hashpass) == 0) {
+        if (strcmp(users[i].username, user) == 0 && strcmp(users[i].password, password) == 0) {
             return 1;
         }
     }
