@@ -181,6 +181,7 @@ int main(){
 		printf("Intentando Register\n");
         	ans=registerUser(username,email,password, users, &userCount);
 		}
+    	msgtoJson(ans,message);
 		sprintf(message, "%d", ans);
 		printf("message proccessed\n");
     }       
@@ -192,7 +193,20 @@ int main(){
 	}
     return 0;
 } 
-
+void msgtoJson(, int res, char* message){
+	if(res==1){
+		nJsonFile(message,"LOGIN_SUCCESSFULL",2,0,"AC");							
+	} else{
+		if(res==2)
+			nJsonFile(message,"USER_NOT_FOUND",0,0,"NF");
+		if(res==3)
+			nJsonFile(message,"REGISTER_SUCCESSFULL",0,0,"AC");
+		if(res==4)
+			nJsonFile(message,"USER_ALREADY_EXISTS",0,0,"UE");
+	}
+	printf("Codigo de respuesta recibido %d\n", res);
+	
+}
 // Function to register a new user
 int registerUser(char* user, char* email, char * password, struct User *users, int *userCount) {
     if (*userCount >= MAX_USERS) {

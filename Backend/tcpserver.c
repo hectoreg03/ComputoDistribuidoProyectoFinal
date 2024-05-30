@@ -51,6 +51,90 @@ void aborta_handler(int sig){
    exit(1);
 }
 
+typedef struct {
+    char* user;
+    char* password;
+    int isActive;
+} User;
+
+// Define the ChatRoom structure
+typedef struct {
+    User* admin;
+    char* name;
+    User** users;
+    size_t userCount;
+} ChatRoom;
+
+// Function to create JSON string from ChatRoom object
+char* json_stringify_chatroom(ChatRoom* chatRoom) {
+    cJSON* json = cJSON_CreateObject();
+
+    // Add admin details
+    cJSON* adminJson = cJSON_CreateObject();
+    cJSON_AddStringToObject(adminJson, "user", chatRoom->admin->user);
+    cJSON_AddStringToObject(adminJson, "password", chatRoom->admin->password);
+    cJSON_AddBoolToObject(adminJson, "isActive", chatRoom->admin->isActive);
+    cJSON_AddItemToObject(json, "admin", adminJson);
+
+    // Add name
+    cJSON_AddStringToObject(json, "name", chatRoom->name);
+
+    // Add users array
+    cJSON* usersJson = cJSON_CreateArray();
+    for (size_t i = 0; i < chatRoom->userCount; i++) {
+        cJSON* userJson = cJSON_CreateObject();
+        cJSON_AddStringToObject(userJson, "user", chatRoom->users[i]->user);
+        cJSON_AddStringToObject(userJson, "password", chatRoom->users[i]->password);
+        cJSON_AddBoolToObject(userJson, "isActive", chatRoom->users[i]->isActive);
+        cJSON_AddItemToArray(usersJson, userJson);
+    }
+    cJSON_AddItemToObject(json, "users", usersJson);
+
+    // Convert the cJSON object to a string
+    char* jsonString = cJSON_PrintUnformatted(json);
+
+    // Clean up the cJSON object
+    cJSON_Delete(json);
+
+    return jsonString;  // Caller must free this string
+}
+
+// Helper function to create a User
+User* create_user(const char* user, const char* password, int isActive) {
+    User* newUser = (User*)malloc(sizeof(User));
+    newUser->user = strdup(user);
+    newUser->password = strdup(password);
+    newUser->isActive = isActive;
+    return newUser;
+}
+
+// Helper function to create a ChatRoom
+ChatRoom* create_chatroom(User* admin, const char* name, User** users, size_t userCount) {
+    ChatRoom* chatRoom = (ChatRoom*)malloc(sizeof(ChatRoom));
+    chatRoom->admin = admin;
+    chatRoom->name = strdup(name);
+    chatRoom->users = users;
+    chatRoom->userCount = userCount;
+    return chatRoom;
+}
+
+// Function to free User memory
+void free_user(User* user) {
+    free(user->user);
+    free(user->password);
+    free(user);
+}
+
+// Function to free ChatRoom memory
+void free_chatroom(ChatRoom* chatRoom) {
+    free(chatRoom->name);
+    free_user(chatRoom->admin);
+    for (size_t i = 0; i < chatRoom->userCount; i++) {
+        free_user(chatRoom->users[i]);
+    }
+    free(chatRoom->users);
+    free(chatRoom);
+}
 
 void nJsonFile(char *json,char* inst, int id, int fila, char* msg){
 	char ejemplo[1000]="";
@@ -176,7 +260,7 @@ void readJsonFile(char *archivo, char *inst, int *id, int *fila, char *col){
 	Nota Isaac, es muy importante que modifiques la IP y el puerto para los del servidor UDP
 */
 
-int udp(char *message, int intencion)
+void udp(char *message, int intencion, char* ans)
 {    
     char buffer[1000]; 
     char ip[16]="172.18.2.4";
@@ -217,13 +301,10 @@ int udp(char *message, int intencion)
         if(intencion==1)return 4;
     }else{
         buffer[n] = '\0'; 
-        printf("\nHe recibido del server: ");
-        printf("%s\n",buffer);
-        ans= atoi(buffer);
+        strcpy(ans,buffer);
     }
     // close the descriptor 
     close(sockfd); 
-    return ans;
 } 
 
 void descifrar( char* mensaje){
@@ -324,22 +405,13 @@ int main(){
 				}else{
 					if(strcmp(inst,"LOGIN")==0||strcmp(inst,"REGISTER")==0){
 						printf("Enviando una request de %s\n",inst);
+						char res[1000];
 						int res;
 						if(strcmp(inst,"LOGIN")==0)
-							res=udp(json,0);
+							udp(json,0,res);
 						else
-							res=udp(json,1);
-						if(res==1){
-							nJsonFile(json,"LOGIN_SUCCESSFULL",2,0,"AC");							
-						} else{
-							if(res==2)
-								nJsonFile(json,"USER_NOT_FOUND",0,0,"NF");
-							if(res==3)
-								nJsonFile(json,"REGISTER_SUCCESSFULL",0,0,"AC");
-							if(res==4)
-								nJsonFile(json,"USER_ALREADY_EXISTS",0,0,"UE");
-						}
-						printf("Codigo de respuesta recibido %d\n", res);
+							udp(json,1,res);
+						strcpy(json,res);
 						printf("JSON generado: %s\n", json);
 					} else{	
 						if(strcmp(inst,"UPD")==0){
