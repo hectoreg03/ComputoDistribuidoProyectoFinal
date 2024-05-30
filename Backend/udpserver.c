@@ -46,6 +46,23 @@ struct User {
     char email[MAX_EMAIL_LENGTH]; 
 };
 
+void nJsonFile(char *json,char* inst, int id, int fila, char* msg){
+	char ejemplo[1000]="";
+	char nstr[10];
+	strcpy(ejemplo,"{\"inst\":\"");
+	strcat(ejemplo,inst);
+	strcat(ejemplo,"\",\"id\": ");
+	sprintf(nstr, "%d", id);
+	strcat(ejemplo,nstr);
+	strcat(ejemplo," ,\"fila\": ");
+	sprintf(nstr, "%d", fila);
+	strcat(ejemplo,nstr);
+	strcat(ejemplo,",\"msg\": \"");
+	strcat(ejemplo,msg);
+	strcat(ejemplo,"\"}\0");
+	strcpy(json,ejemplo);
+}
+
 // Function prototypes
 int registerUser(char* user, char* email, char * password, struct User *users, int *userCount);
 int loginUser(char* user, char* email, char * password,struct User *users, int *userCount);
@@ -193,7 +210,7 @@ int main(){
 	}
     return 0;
 } 
-void msgtoJson(, int res, char* message){
+void msgtoJson( int res, char* message){
 	if(res==1){
 		nJsonFile(message,"LOGIN_SUCCESSFULL",2,0,"AC");							
 	} else{

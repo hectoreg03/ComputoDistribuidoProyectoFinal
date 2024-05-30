@@ -292,13 +292,12 @@ void udp(char *message, int intencion, char* ans)
       
     // waiting for response 
     int len = sizeof(servaddr);
-    int ans=-1;
     int n = recvfrom(sockfd, buffer, MAXLINE, 0, (struct sockaddr*)&servaddr, &len);
     if(n < 0) {
         perror("recvfrom failed");
         exit(EXIT_FAILURE);
-        if(intencion==0)return 2;
-        if(intencion==1)return 4;
+        if(intencion==0)nJsonFile(ans,"USER_NOT_FOUND",0,0,"NF");
+        if(intencion==1)nJsonFile(ans,"USER_ALREADY_EXISTS",0,0,"UE");
     }else{
         buffer[n] = '\0'; 
         strcpy(ans,buffer);
@@ -406,7 +405,6 @@ int main(){
 					if(strcmp(inst,"LOGIN")==0||strcmp(inst,"REGISTER")==0){
 						printf("Enviando una request de %s\n",inst);
 						char res[1000];
-						int res;
 						if(strcmp(inst,"LOGIN")==0)
 							udp(json,0,res);
 						else
@@ -418,8 +416,9 @@ int main(){
 							// Se manda mensaje al servido UDP para que se descarguen los mensajes a este server antes de mandarlos de vuelta al 	
 						} else{
 							if(strcmp(inst,"MSG")==0){
-								int res;
-								res=udp(json,2);
+								char res[1000];
+								udp(json,2, res);
+								strcpy(json,res);
 							} else{
 								sigue='N';
 							}
