@@ -1,5 +1,6 @@
+
 /*
-  Cliente del programa numero 1, de la materia CÃ³mputo Distribuido
+  Cliente del programa numero 1, de la materia Cómputo Distribuido
   
 
    Lectura remota de un directorio usando sockets pertenecientes
@@ -12,7 +13,7 @@
 
    Compilacion: cc tcpclient.c cJSON.c -lnsl -o tcpclient
 
-   Ejecucion: ./tcpclient 172.18.2.2    
+   Ejecucion: ./tcpclient 172.18.2.3    
 */
 
 
@@ -279,7 +280,7 @@ int main(argc, argv)
 			printf("Ingrese el correo usuariuo:\n");
 			scanf("%s",email);
 			char pass[100];
-			printf("Ingrese la contraseña de usuario:\n");
+			printf("Ingrese la contrase?a de usuario:\n");
 			scanf("%s",pass);
 			char expresion[1000];
 			nJsonFile2(expresion, inst, usr, email, pass);

@@ -20,6 +20,7 @@
 #include <netinet/in.h> 
 #include <unistd.h> 
 #include <stdlib.h>
+#include <stdbool.h>
 #include "cJSON.h"
 #include "SHA256.h"
 
@@ -39,37 +40,100 @@
 // Registrar fallo 4
 //
 
-// Structure to represent a user
-struct User {
-    char username[MAX_USERNAME_LENGTH];
+// Assuming these structures and functions are defined as per the previous example
+typedef struct {
+    char user[MAX_USERNAME_LENGTH];
     char password[MAX_PASSWORD_LENGTH];
-    char email[MAX_EMAIL_LENGTH]; 
-};
+    int isActive;
+    int msgSent;
+} User;
 
-void nJsonFile(char *json,char* inst, int id, int fila, char* msg){
-	char ejemplo[1000]="";
-	char nstr[10];
-	strcpy(ejemplo,"{\"inst\":\"");
-	strcat(ejemplo,inst);
-	strcat(ejemplo,"\",\"id\": ");
-	sprintf(nstr, "%d", id);
-	strcat(ejemplo,nstr);
-	strcat(ejemplo," ,\"fila\": ");
-	sprintf(nstr, "%d", fila);
-	strcat(ejemplo,nstr);
-	strcat(ejemplo,",\"msg\": \"");
-	strcat(ejemplo,msg);
-	strcat(ejemplo,"\"}\0");
-	strcpy(json,ejemplo);
-}
+User users[MAX_USERS];
+
+typedef struct {
+    User* admin;
+    char* name;
+    User** users;
+    size_t userCount;
+} ChatRoom;
+
+typedef struct {
+    char **messages;  // Pointer to an array of strings
+    int size;         // Current number of messages
+    int capacity;     // Current capacity of the array
+} Messages;
+
+
+User* create_user(const char* user, const char* password, int isActive);
+ChatRoom* create_chatroom(User* admin, const char* name, User** users, size_t userCount);
+void free_user(User* user);
+void free_chatroom(ChatRoom* chatRoom);
+char* json_stringify_chatroom(ChatRoom* chatRoom);
+char* json_stringify_chatrooms(ChatRoom** chatRooms, size_t chatRoomCount);
+void handle_new_chatroom(ChatRoom* newChatRoom);
+void send_message(const char* message,const char* user) ;
+void broadcast(const char* message, Messages *array);
 
 // Function prototypes
-int registerUser(char* user, char* email, char * password, struct User *users, int *userCount);
-int loginUser(char* user, char* email, char * password,struct User *users, int *userCount);
+void registerUser(char* ans, char* user,  char * password,  int *userCount);
+void loginUser(char* ans, char* user,  char * password, int *userCount);
 
-void readJsonFile(char *archivo, char *inst,char *user,char *email,char *password){
+// Example list of chat rooms
+ChatRoom** chatRooms = NULL;
+size_t chatRoomCount = 0;
+  
+bool room_exists(const char* roomName) {
+    for (size_t i = 0; i < chatRoomCount; i++) {
+        if (strcmp(chatRooms[i]->name, roomName) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Function to initialize the dynamic array
+void initMessages(Messages *array, int initialCapacity) {
+    array->messages = malloc(initialCapacity * sizeof(char *));
+    array->size = 0;
+    array->capacity = initialCapacity;
+}
+
+// Function to add a message to the dynamic array
+void addMessage(Messages *array, const char *message) {
+    // Check if we need to resize the array
+    if (array->size == array->capacity) {
+        // Double the capacity
+        array->capacity *= 2;
+        array->messages = realloc(array->messages, array->capacity * sizeof(char *));
+    }
+    // Allocate memory for the new message and copy it
+    array->messages[array->size] = malloc(strlen(message) + 1);
+    strcpy(array->messages[array->size], message);
+    array->size++;
+}
+
+// Function to free the memory allocated for the array
+void freeMessages(Messages *array) {
+    for (int i = 0; i < array->size; i++) {
+        free(array->messages[i]);
+    }
+    free(array->messages);
+    array->messages = NULL;
+    array->size = 0;
+    array->capacity = 0;
+}
+
+// Function to print all messages in the dynamic array
+void printMessages(Messages *array) {
+    for (int i = 0; i < array->size; i++) {
+        printf("Message %d: %s\n", i + 1, array->messages[i]);
+    }
+}
+
+void readInstruction(char *archivo, char *inst){
 	
 	cJSON* json = cJSON_Parse(archivo);
+
 	printf("Archivo Parseado\n");
     if (json == NULL) {
         const char* error_ptr = cJSON_GetErrorPtr();
@@ -87,66 +151,118 @@ void readJsonFile(char *archivo, char *inst,char *user,char *email,char *passwor
     } else{
 	
 	    // Extract the value as a string
-	    char* instValue = strdup(instJ->valuestring);
-	    
-	    char* userValue;
-	    
-	    char* emailValue;
-	    
-	    char* passwordValue;
-	    
-	    cJSON* userJ = cJSON_GetObjectItemCaseSensitive(json, "user");
-	    if (userJ == NULL) {
-	        fprintf(stderr, "JSON does not contain 'user' parameter\n");
-	    } else{
-	
-	    // Extract the value as a string
-	    userValue = strdup(userJ->valuestring);
-		}
-		
-	    cJSON* emailJ = cJSON_GetObjectItemCaseSensitive(json, "user");
-	    if (emailJ == NULL) {
-	        fprintf(stderr, "JSON does not contain 'email' parameter\n");
-	    } else{
-			emailValue = strdup(emailJ->valuestring);
-		}
-		
-	    cJSON* passwordJ = cJSON_GetObjectItemCaseSensitive(json, "user");
-	    if (passwordJ == NULL) {
-	        fprintf(stderr, "JSON does not contain 'password' parameter\n");
-	    } else{
-			passwordValue = strdup(passwordJ->valuestring);
-		}
-		
-		
+	    char* instValue = strdup(instJ->valuestring);		
 		strcpy(inst,instValue);
-		strcpy(user,userValue);
-		strcpy(email,emailValue);
-		strcpy(password,passwordValue);
 	}
 
     // Clean up
     cJSON_Delete(json);
 	printf("todo salio \n");
 	
-	
-	
 }
-char *SHA256( char* message){
-	BYTE buf[SHA256_BLOCK_SIZE];
-	SHA256_CTX ctx;
-	sha256_init(&ctx);
-	sha256_update(&ctx, message, strlen(message));
-	sha256_final(&ctx, buf);
-	char sal[SHA256_BLOCK_SIZE];
-	for( int i=0; i<SHA256_BLOCK_SIZE; i++){
-		sal[i]=buf[i];
-	}
+
+
+void readCrendentialsJson(const char* jsonString, char* user, char* password) {
+    // Parse the JSON string
+    cJSON* json = cJSON_Parse(jsonString);
+    if (!json) {
+        fprintf(stderr, "Error parsing JSON: %s\n", cJSON_GetErrorPtr());
+        return;
+    }
+    
+    char tUser[MAX_USERNAME_LENGTH];
+    char tPassword[MAX_PASSWORD_LENGTH];
+
+    // Get the "user" and "password" fields from the JSON object
+    cJSON* userJson = cJSON_GetObjectItem(json, "user");
+    cJSON* passwordJson = cJSON_GetObjectItem(json, "password");
+
+    if (cJSON_IsString(userJson) && cJSON_IsString(passwordJson)) {
+        // Copy the values to the UserCredentials structure
+        //tUser = strdup(userJson->valuestring);
+        //tPassword = strdup(passwordJson->valuestring);
+        strcpy(user,strdup(userJson->valuestring));
+        strcpy(password,strdup(passwordJson->valuestring));
+    } else {
+        fprintf(stderr, "Invalid JSON format\n");
+        cJSON_Delete(json);
+        return ;
+    }
+
+    // Clean up the cJSON object
+    cJSON_Delete(json);
+}
+
+void createInstJson(char* ans, char* inst) {
+    // Create a new cJSON object
+    cJSON *json = cJSON_CreateObject();
+    
+    // Add the "inst" field with the value "ROOM_ALREADY_EXISTS"
+    cJSON_AddStringToObject(json, "inst", inst);
+
+    // Convert the cJSON object to a JSON string
+    char *jsonString = cJSON_PrintUnformatted(json);
+	strcpy(ans,jsonString);
+    // Clean up the cJSON object
+    cJSON_Delete(json);
+}
+
+void write_chatrooms_to_file(const char* filename) {
+    char* jsonString = json_stringify_chatrooms(chatRooms, chatRoomCount);
+    if (jsonString) {
+        FILE* file = fopen(filename, "w");
+        if (file) {
+            fprintf(file, "%s", jsonString);
+            fclose(file);
+            printf("[CHATROOMS SAVED]\n");
+        } else {
+            perror("Error writing to file");
+        }
+        free(jsonString);
+    }
+}
+
+void handle_new_chatroom(ChatRoom* newChatRoom) {
+	/*
+    if (room_exists(newChatRoom->name)) {
+        send_message("{\"inst\": \"ROOM_ALREADY_EXISTS\"}");
+        return;
+    }
+
+    // Append the new chat room to the list
+    chatRooms = realloc(chatRooms, sizeof(ChatRoom*) * (chatRoomCount + 1));
+    chatRooms[chatRoomCount] = newChatRoom;
+    chatRoomCount++;
+
+    send_message("{\"inst\": \"ROOM_CREATED_SUCCESSFULLY\"}");
+
+    write_chatrooms_to_file("chatRooms.json");
+
+    // Broadcast updated chat rooms
+    char* jsonString = json_stringify_chatrooms(chatRooms, chatRoomCount);
+    if (jsonString) {
+        broadcast(jsonString);
+        free(jsonString);
+    }*/
+}
+  
+  
+  
+void send_message(const char* message,const char* user) {
+    // Placeholder for sending message to client
+    printf("Sending message to client: %s\n", message);
+}
+
+void broadcast(const char* message, Messages *array) {
+    // Placeholder for broadcasting message to all clients
+    printf("Broadcasting message to all clients: %s\n", message);
+    addMessage(array,message);
 }
   
 // Driver code 
-int main(){    
-	struct User users[MAX_USERS];
+int main(){   
+	Messages allMessages;
+    initMessages(&allMessages, 2); // Initial capacity of 2
 	int userCount = 0;
     char buffer[MAXLINE]; 
     char message[500] = "Hello Client"; 
@@ -188,18 +304,51 @@ int main(){
         int ans=-1;
     	char username[MAX_USERNAME_LENGTH];
     	char password[MAX_PASSWORD_LENGTH];
-    	char email[MAX_EMAIL_LENGTH];
-        readJsonFile(buffer,inst,username,email,password);
+    	int isActive=0;
+        readInstruction(buffer,inst);
         if(strcmp(inst,"LOGIN")==0){
-		printf("intentando Login\n");
-        	ans=loginUser(username,email,password,users, &userCount);
+        	readCrendentialsJson(buffer, username, password);
+			printf("intentando Login: %s\n",username);
+        	ans=1;
+			loginUser(message, username,password, &userCount);
 		}
-        if(strcmp(inst,"REGISTER")==0){
+	    if(strcmp(inst,"REGISTER")==0){
+        	readCrendentialsJson(buffer, username, password);
+			printf("Intentando Register: %s\n",username);
+        	ans=1;
+			registerUser(message,username,password, &userCount);
+		}
+	    if(strcmp(inst,"DISCONNECT")==0){
+			printf("Desconectando\n");
+        	ans=1;
+			//disconnectUser(message,username,password, &userCount);
+		}
+		
+	    if(strcmp(inst,"MESSAGE")==0){
+	    	broadcast(buffer,&allMessages);
+			printf("Intentando Register\n");
+        	ans=1;
+			registerUser(message,username,password, &userCount);
+		}
+	    if(strcmp(inst,"CREATE_ROOM")==0){
 		printf("Intentando Register\n");
-        	ans=registerUser(username,email,password, users, &userCount);
+        	ans=1;
+			registerUser(message,username,password, &userCount);
 		}
-    	msgtoJson(ans,message);
-		sprintf(message, "%d", ans);
+		/*
+	    if(strcmp(inst,"REGISTER")==0){
+		printf("Intentando Register\n");
+        	ans=1;
+			registerUser(message,username,password, &userCount);
+		}
+	    if(strcmp(inst,"REGISTER")==0){
+		printf("Intentando Register\n");
+        	ans=1;
+			registerUser(message,username,password, &userCount);
+		}*/
+		if(ans==0){
+        	createInstJson(message,"Unknown_Instruction");
+		}
 		printf("message proccessed\n");
     }       
     // send the response 
@@ -210,46 +359,95 @@ int main(){
 	}
     return 0;
 } 
-void msgtoJson( int res, char* message){
-	if(res==1){
-		nJsonFile(message,"LOGIN_SUCCESSFULL",2,0,"AC");							
-	} else{
-		if(res==2)
-			nJsonFile(message,"USER_NOT_FOUND",0,0,"NF");
-		if(res==3)
-			nJsonFile(message,"REGISTER_SUCCESSFULL",0,0,"AC");
-		if(res==4)
-			nJsonFile(message,"USER_ALREADY_EXISTS",0,0,"UE");
-	}
-	printf("Codigo de respuesta recibido %d\n", res);
-	
-}
 // Function to register a new user
-int registerUser(char* user, char* email, char * password, struct User *users, int *userCount) {
+void registerUser(char* ans, char* user, char * password, int *userCount) {
     if (*userCount >= MAX_USERS) {
         printf("Cannot register more users. Maximum user limit reached.\n");
-        return 4;
+        	createInstJson(ans,"USER_ALREADY_EXISTS");
+        return;
     }
 
     printf("Registering User\n");
-    strcpy(users[*userCount].username,user);
-    strcpy(users[*userCount].email,email);
-    //char *hashpass=  SHA256(password);
+    strcpy(users[*userCount].user,user);
+    users[*userCount].isActive=0;
+    users[*userCount].msgSent=0;
     strcpy( users[*userCount].password,password);
 
     printf("User registered successfully.\n");
     (*userCount)++;
-    return 3;
+    
+    createInstJson(ans,"REGISTER_SUCCESSFULL");
 }
 
 // Function to login a user
-int loginUser(char* user, char* email, char * password, struct User *users, int *userCount) {
-    //char *hashpass=  SHA256(password);
+void loginUser(char* ans, char* user,  char * password, int *userCount) {
+	
     for (int i = 0; i < *userCount; i++) {
-        if (strcmp(users[i].username, user) == 0 && strcmp(users[i].password, password) == 0) {
-            return 1;
+        if (strcmp(users[i].user, user) == 0 && strcmp(users[i].password, password) == 0) {
+        	users[i].isActive=1;
+        	createInstJson(ans,"LOGIN_SUCCESSFULL");
+            return;
         }
     }
-    
-    return 2;
+    createInstJson(ans,"USER_NOT_FOUND");
+}
+
+
+// Implementations for the JSON conversion functions
+char* json_stringify_user(User* user) {
+    cJSON* json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "user", user->user);
+    cJSON_AddStringToObject(json, "password", user->password);
+    cJSON_AddBoolToObject(json, "isActive", user->isActive);
+    char* jsonString = cJSON_PrintUnformatted(json);
+    cJSON_Delete(json);
+    return jsonString;
+}
+
+char* json_stringify_chatroom(ChatRoom* chatRoom) {
+    cJSON* json = cJSON_CreateObject();
+    cJSON* adminJson = cJSON_CreateObject();
+    cJSON_AddStringToObject(adminJson, "user", chatRoom->admin->user);
+    cJSON_AddStringToObject(adminJson, "password", chatRoom->admin->password);
+    cJSON_AddBoolToObject(adminJson, "isActive", chatRoom->admin->isActive);
+    cJSON_AddItemToObject(json, "admin", adminJson);
+    cJSON_AddStringToObject(json, "name", chatRoom->name);
+    cJSON* usersJson = cJSON_CreateArray();
+    for (size_t i = 0; i < chatRoom->userCount; i++) {
+        cJSON* userJson = cJSON_CreateObject();
+        cJSON_AddStringToObject(userJson, "user", chatRoom->users[i]->user);
+        cJSON_AddStringToObject(userJson, "password", chatRoom->users[i]->password);
+        cJSON_AddBoolToObject(userJson, "isActive", chatRoom->users[i]->isActive);
+        cJSON_AddItemToArray(usersJson, userJson);
+    }
+    cJSON_AddItemToObject(json, "users", usersJson);
+    char* jsonString = cJSON_PrintUnformatted(json);
+    cJSON_Delete(json);
+    return jsonString;
+}
+
+char* json_stringify_chatrooms(ChatRoom** chatRooms, size_t chatRoomCount) {
+    cJSON* jsonArray = cJSON_CreateArray();
+    for (size_t i = 0; i < chatRoomCount; i++) {
+        cJSON* chatRoomJson = cJSON_CreateObject();
+        cJSON* adminJson = cJSON_CreateObject();
+        cJSON_AddStringToObject(adminJson, "user", chatRooms[i]->admin->user);
+        cJSON_AddStringToObject(adminJson, "password", chatRooms[i]->admin->password);
+        cJSON_AddBoolToObject(adminJson, "isActive", chatRooms[i]->admin->isActive);
+        cJSON_AddItemToObject(chatRoomJson, "admin", adminJson);
+        cJSON_AddStringToObject(chatRoomJson, "name", chatRooms[i]->name);
+        cJSON* usersJson = cJSON_CreateArray();
+        for (size_t j = 0; j < chatRooms[i]->userCount; j++) {
+            cJSON* userJson = cJSON_CreateObject();
+            cJSON_AddStringToObject(userJson, "user", chatRooms[i]->users[j]->user);
+            cJSON_AddStringToObject(userJson, "password", chatRooms[i]->users[j]->password);
+            cJSON_AddBoolToObject(userJson, "isActive", chatRooms[i]->users[j]->isActive);
+            cJSON_AddItemToArray(usersJson, userJson);
+        }
+        cJSON_AddItemToObject(chatRoomJson, "users", usersJson);
+        cJSON_AddItemToArray(jsonArray, chatRoomJson);
+    }
+    char* jsonString = cJSON_PrintUnformatted(jsonArray);
+    cJSON_Delete(jsonArray);
+    return jsonString;
 }

@@ -51,145 +51,26 @@ void aborta_handler(int sig){
    exit(1);
 }
 
-typedef struct {
-    char* user;
-    char* password;
-    int isActive;
-} User;
 
-// Define the ChatRoom structure
-typedef struct {
-    User* admin;
-    char* name;
-    User** users;
-    size_t userCount;
-} ChatRoom;
+void createInstJson(char* ans, char* inst) {
+    // Create a new cJSON object
+    cJSON *json = cJSON_CreateObject();
+    
+    // Add the "inst" field with the value "ROOM_ALREADY_EXISTS"
+    cJSON_AddStringToObject(json, "inst", inst);
 
-// Function to create JSON string from ChatRoom object
-char* json_stringify_chatroom(ChatRoom* chatRoom) {
-    cJSON* json = cJSON_CreateObject();
-
-    // Add admin details
-    cJSON* adminJson = cJSON_CreateObject();
-    cJSON_AddStringToObject(adminJson, "user", chatRoom->admin->user);
-    cJSON_AddStringToObject(adminJson, "password", chatRoom->admin->password);
-    cJSON_AddBoolToObject(adminJson, "isActive", chatRoom->admin->isActive);
-    cJSON_AddItemToObject(json, "admin", adminJson);
-
-    // Add name
-    cJSON_AddStringToObject(json, "name", chatRoom->name);
-
-    // Add users array
-    cJSON* usersJson = cJSON_CreateArray();
-    for (size_t i = 0; i < chatRoom->userCount; i++) {
-        cJSON* userJson = cJSON_CreateObject();
-        cJSON_AddStringToObject(userJson, "user", chatRoom->users[i]->user);
-        cJSON_AddStringToObject(userJson, "password", chatRoom->users[i]->password);
-        cJSON_AddBoolToObject(userJson, "isActive", chatRoom->users[i]->isActive);
-        cJSON_AddItemToArray(usersJson, userJson);
-    }
-    cJSON_AddItemToObject(json, "users", usersJson);
-
-    // Convert the cJSON object to a string
-    char* jsonString = cJSON_PrintUnformatted(json);
-
+    // Convert the cJSON object to a JSON string
+    char *jsonString = cJSON_PrintUnformatted(json);
+	strcpy(ans,jsonString);
     // Clean up the cJSON object
     cJSON_Delete(json);
-
-    return jsonString;  // Caller must free this string
 }
 
-// Helper function to create a User
-User* create_user(const char* user, const char* password, int isActive) {
-    User* newUser = (User*)malloc(sizeof(User));
-    newUser->user = strdup(user);
-    newUser->password = strdup(password);
-    newUser->isActive = isActive;
-    return newUser;
-}
 
-// Helper function to create a ChatRoom
-ChatRoom* create_chatroom(User* admin, const char* name, User** users, size_t userCount) {
-    ChatRoom* chatRoom = (ChatRoom*)malloc(sizeof(ChatRoom));
-    chatRoom->admin = admin;
-    chatRoom->name = strdup(name);
-    chatRoom->users = users;
-    chatRoom->userCount = userCount;
-    return chatRoom;
-}
-
-// Function to free User memory
-void free_user(User* user) {
-    free(user->user);
-    free(user->password);
-    free(user);
-}
-
-// Function to free ChatRoom memory
-void free_chatroom(ChatRoom* chatRoom) {
-    free(chatRoom->name);
-    free_user(chatRoom->admin);
-    for (size_t i = 0; i < chatRoom->userCount; i++) {
-        free_user(chatRoom->users[i]);
-    }
-    free(chatRoom->users);
-    free(chatRoom);
-}
-
-void nJsonFile(char *json,char* inst, int id, int fila, char* msg){
-	char ejemplo[1000]="";
-	char nstr[10];
-	strcpy(ejemplo,"{\"inst\":\"");
-	strcat(ejemplo,inst);
-	strcat(ejemplo,"\",\"id\": ");
-	sprintf(nstr, "%d", id);
-	strcat(ejemplo,nstr);
-	strcat(ejemplo," ,\"fila\": ");
-	sprintf(nstr, "%d", fila);
-	strcat(ejemplo,nstr);
-	strcat(ejemplo,",\"msg\": \"");
-	strcat(ejemplo,msg);
-	strcat(ejemplo,"\"}\0");
-	strcpy(json,ejemplo);
-}
-
-void nJsonTurno(char *json,int id){
-	char ejemplo[1000]="";
-	char nstr[10];
-	strcpy(ejemplo,"{\"inst\":\"");
-	strcat(ejemplo,"TURNO");
-	strcat(ejemplo,"\",\"id\": ");
-	sprintf(nstr, "%d", id);
-	strcat(ejemplo,nstr);
-	strcat(ejemplo,"}\0");
-	strcpy(json,ejemplo);
-}
-
-int isNumberl(const char *str) {
-    if (!str || *str == '\0') // Null or empty string
-        return 0;
-
-    char *endptr;
-    errno = 0; // To distinguish success/failure after call
-    strtol(str, &endptr, 10);
-
-    // Check for various possible errors
-    if ((errno == ERANGE && (strtol(str, NULL, 10) == LONG_MAX || strtol(str, NULL, 10) == LONG_MIN)) || (errno != 0 && strtol(str, NULL, 10) == 0)) {
-        return 0; // Not a valid number
-    }
-    // If there are any non-numeric characters in the string, it's not a number
-    while (*endptr != '\0') {
-        if (!isspace((unsigned char)*endptr) && !isdigit((unsigned char)*endptr)) {
-            	return 0; // Not a valid number
-        }
-        endptr++;
-    }
-    return 1; // String can be converted to a number
-}
-
-void readJsonFile(char *archivo, char *inst, int *id, int *fila, char *col){
+void readInstruction(char *archivo, char *inst){
 	
 	cJSON* json = cJSON_Parse(archivo);
+
 	printf("Archivo Parseado\n");
     if (json == NULL) {
         const char* error_ptr = cJSON_GetErrorPtr();
@@ -207,52 +88,40 @@ void readJsonFile(char *archivo, char *inst, int *id, int *fila, char *col){
     } else{
 	
 	    // Extract the value as a string
-	    char* instValue = strdup(instJ->valuestring);
-	    
-	    char* idValue;
-	    
-	    char* filaValue;
-	    
-	    char* columnaValue;
-	    
-	    cJSON *id_obj;
-	    id_obj = cJSON_GetObjectItemCaseSensitive(json, "id");
-	    if (id_obj == NULL ) {
-	        printf("Error: 'id' not found or not a number.\n");
-	    }else{
-			idValue=strdup(id_obj->valuestring);
-	    	if(isNumberl(idValue)==1)
-	    		*id = atoi(idValue);
-		}
-	    
-	    cJSON *fila_obj;
-	    fila_obj = cJSON_GetObjectItemCaseSensitive(json, "fila");
-	    if (fila_obj == NULL ) {
-	        printf("Error: 'fila' not found or not a number.\n");
-	    }else{
-			filaValue=strdup(fila_obj->valuestring);
-	    	if(isNumberl(filaValue)==1)
-	    		*fila = atoi(filaValue);
-		}
-	    
-	    cJSON *columna_obj;
-    	columna_obj = cJSON_GetObjectItemCaseSensitive(json, "msg");
-	    if (columna_obj == NULL ) {
-	        printf("Error: 'columna' not found or not a number.\n");
-	    }else{
-		    char* colValue = strdup(instJ->valuestring);
-			strcpy(col,colValue);
-		}
-		
-		
+	    char* instValue = strdup(instJ->valuestring);		
 		strcpy(inst,instValue);
-		
 	}
 
     // Clean up
     cJSON_Delete(json);
-	printf("todo salio bien");
+	printf("todo salio \n");
 	
+}
+
+
+void readCrendentialsJson(const char* jsonString, char* user) {
+    // Parse the JSON string
+    cJSON* json = cJSON_Parse(jsonString);
+    if (!json) {
+        fprintf(stderr, "Error parsing JSON: %s\n", cJSON_GetErrorPtr());
+        return;
+    }
+
+    // Get the "user" and "password" fields from the JSON object
+    cJSON* userJson = cJSON_GetObjectItem(json, "user");
+    cJSON* passwordJson = cJSON_GetObjectItem(json, "password");
+
+    if (cJSON_IsString(userJson) && cJSON_IsString(passwordJson)) {
+        // Copy the values to the UserCredentials structure
+        strcpy(user,strdup(userJson->valuestring));
+    } else {
+        fprintf(stderr, "Invalid JSON format\n");
+        cJSON_Delete(json);
+        return ;
+    }
+
+    // Clean up the cJSON object
+    cJSON_Delete(json);
 }
 
 
@@ -260,7 +129,7 @@ void readJsonFile(char *archivo, char *inst, int *id, int *fila, char *col){
 	Nota Isaac, es muy importante que modifiques la IP y el puerto para los del servidor UDP
 */
 
-void udp(char *message, int intencion, char* ans)
+void udp(char *message, char* ans)
 {    
     char buffer[1000]; 
     char ip[16]="172.18.2.4";
@@ -296,8 +165,7 @@ void udp(char *message, int intencion, char* ans)
     if(n < 0) {
         perror("recvfrom failed");
         exit(EXIT_FAILURE);
-        if(intencion==0)nJsonFile(ans,"USER_NOT_FOUND",0,0,"NF");
-        if(intencion==1)nJsonFile(ans,"USER_ALREADY_EXISTS",0,0,"UE");
+        createInstJson(ans,"LOST_CONNECTION_WITH_SERVER");
     }else{
         buffer[n] = '\0'; 
         strcpy(ans,buffer);
@@ -368,24 +236,19 @@ int main(){
 			exit(1);
 		}
 		printf("Conexiones establecidas\n");
-		pid_t child_pid;
-		child_pid=fork();
+		pid_t child_pid=0;
+		//child_pid=fork();
 		
 		if(child_pid==0){
-	 		int messages_sent=0, messages_recieved=0;
 			printf("sd_Actual: %d\n",(int)sd_actual );
 			char sigue='S';
 			char msgReceived[1000];
 			char inst[100];
 			char msgCnt[1000];
-			int turno=0;
-			int notsendanything=0;
-			int idc, fil;
+			char loggedUser[1000];
 			strcpy(json,"");
-			int logina=0;
 			
-			while(sigue=='S'){	
-				idc=0;		
+			while(sigue=='S'){			
 				/* tomar un mensaje del cliente */
 				int n;		
 				n = recv(sd_actual, msg, sizeof(msg), 0);
@@ -396,48 +259,41 @@ int main(){
 				msg[n] = '\0';
 				descifrar(msg);		
 				strcpy(json,msg);
-				readJsonFile(json, inst, &idc, &fil, msgCnt);
+				readInstruction(json, inst);
 				printf("Instruccion recibida: %s\n", inst);
 				if((strcmp(inst,"close")==0)){ //it means that the conversation must be closed
 					sigue='N';
-					nJsonFile(json,inst,idc,fil,msgCnt);
+					createInstJson(json,"close");
 				}else{
-					if(strcmp(inst,"LOGIN")==0||strcmp(inst,"REGISTER")==0){
+					if(strcmp(inst,"LOGIN")==0){
 						printf("Enviando una request de %s\n",inst);
 						char res[1000];
-						if(strcmp(inst,"LOGIN")==0)
-							udp(json,0,res);
-						else
-							udp(json,1,res);
+						udp(json,res);
 						strcpy(json,res);
+						readInstruction(json, inst);
+						if(strcmp(inst,"LOGIN_SUCCESSFULL")==0){
+							readCrendentialsJson(json, loggedUser);
+							printf("Login en la conexion actual: %s\n",loggedUser);
+						}
+						
 						printf("JSON generado: %s\n", json);
 					} else{	
-						if(strcmp(inst,"UPD")==0){
-							// Se manda mensaje al servido UDP para que se descarguen los mensajes a este server antes de mandarlos de vuelta al 	
-						} else{
-							if(strcmp(inst,"MSG")==0){
-								char res[1000];
-								udp(json,2, res);
-								strcpy(json,res);
-							} else{
-								sigue='N';
-							}
-						}
+						printf("Enviando una request de %s\n",inst);
+						char res[1000];
+						udp(json,res);
+						strcpy(json,res);
+						printf("JSON generado: %s\n", json);
 					}
 				}		
 				/* enviando la respuesta del servicio */
 				int sent;
-				if(notsendanything==0){
-					printf("mensaje previo a cifrar: %s\n", json);
-					cifrar(json);
-					printf("mensaje enviado a: %s\n", json);
-					if ( (sent = send(sd_actual, json, strlen(json), 0)) == -1) {
-						perror("send");
-						exit(1);
-					}
-					
+				printf("mensaje previo a cifrar: %s\n", json);
+				cifrar(json);
+				printf("mensaje enviado a: %s\n", json);
+				if ( (sent = send(sd_actual, json, strlen(json), 0)) == -1) {
+					perror("send");
+					exit(1);
 				}
-				notsendanything=0;
 			}
 
 				/* cerrar los dos sockets */
