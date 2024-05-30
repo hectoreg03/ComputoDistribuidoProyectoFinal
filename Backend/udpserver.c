@@ -51,7 +51,7 @@ typedef struct {
 User users[MAX_USERS];
 
 typedef struct {
-    User* admin;
+    char* admin;
     char* name;
     User** users;
     size_t userCount;
@@ -70,7 +70,7 @@ void free_user(User* user);
 void free_chatroom(ChatRoom* chatRoom);
 char* json_stringify_chatroom(ChatRoom* chatRoom);
 char* json_stringify_chatrooms(ChatRoom** chatRooms, size_t chatRoomCount);
-void handle_new_chatroom(ChatRoom* newChatRoom);
+void handle_new_chatroom(char* ans, ChatRoom* newChatRoom,Messages *array);
 void send_message(const char* message,const char* user) ;
 void broadcast(const char* message, Messages *array);
 
@@ -222,10 +222,18 @@ void write_chatrooms_to_file(const char* filename) {
     }
 }
 
-void handle_new_chatroom(ChatRoom* newChatRoom) {
-	/*
+void broadcastChatRooms(Messages *array){
+	char* jsonString = json_stringify_chatrooms(chatRooms, chatRoomCount);
+    if (jsonString) {
+        broadcast(jsonString,array);
+        free(jsonString);
+    }
+}
+
+void handle_new_chatroom(char* ans, ChatRoom* newChatRoom,Messages *array) {
+	
     if (room_exists(newChatRoom->name)) {
-        send_message("{\"inst\": \"ROOM_ALREADY_EXISTS\"}");
+    	createInstJson(ans,"ROOM_ALREADY_EXISTS");
         return;
     }
 
@@ -233,19 +241,132 @@ void handle_new_chatroom(ChatRoom* newChatRoom) {
     chatRooms = realloc(chatRooms, sizeof(ChatRoom*) * (chatRoomCount + 1));
     chatRooms[chatRoomCount] = newChatRoom;
     chatRoomCount++;
-
-    send_message("{\"inst\": \"ROOM_CREATED_SUCCESSFULLY\"}");
+	
+    createInstJson(ans,"ROOM_CREATED_SUCCESSFULLY");
 
     write_chatrooms_to_file("chatRooms.json");
 
     // Broadcast updated chat rooms
-    char* jsonString = json_stringify_chatrooms(chatRooms, chatRoomCount);
-    if (jsonString) {
-        broadcast(jsonString);
-        free(jsonString);
-    }*/
+	broadcastChatRooms(array);
 }
-  
+
+// Helper function to create a User from cJSON object
+User* create_user_from_json(cJSON* json) {
+    User* user = (User*)malloc(sizeof(User));
+    if (!user) return NULL;
+
+    cJSON* userJson = cJSON_GetObjectItem(json, "user");
+    cJSON* passwordJson = cJSON_GetObjectItem(json, "password");
+    cJSON* isActiveJson = cJSON_GetObjectItem(json, "isActive");
+
+    if (cJSON_IsString(userJson) && cJSON_IsString(passwordJson) && cJSON_IsBool(isActiveJson)) {
+        strcpy(user->user, strdup(userJson->valuestring));
+        strcpy(user->password, strdup(passwordJson->valuestring));
+        user->isActive = cJSON_IsTrue(isActiveJson);
+    } else {
+        free(user);
+        return NULL;
+    }
+
+    return user;
+}
+
+// Function to create a ChatRoom from JSON string
+ChatRoom* create_chatroom_from_json(const char* jsonString) {
+    // Parse the JSON string
+    cJSON* json = cJSON_Parse(jsonString);
+    if (!json) {
+        fprintf(stderr, "Error parsing JSON: %s\n", cJSON_GetErrorPtr());
+        return NULL;
+    }
+
+    // Allocate memory for ChatRoom
+    ChatRoom* chatRoom = (ChatRoom*)malloc(sizeof(ChatRoom));
+    if (!chatRoom) {
+        perror("Memory allocation error");
+        cJSON_Delete(json);
+        return NULL;
+    }
+
+    // Initialize userCount to 0
+    chatRoom->userCount = 0;
+    chatRoom->users = NULL;
+
+    // Get the "admin", "name", and "users" fields from the JSON object
+    cJSON* adminJson = cJSON_GetObjectItem(json, "admin");
+    cJSON* nameJson = cJSON_GetObjectItem(json, "name");
+    cJSON* usersJson = cJSON_GetObjectItem(json, "users");
+
+    if (cJSON_IsString(adminJson) && cJSON_IsString(nameJson) && cJSON_IsArray(usersJson)) {
+        // Copy the admin and name fields
+        strcpy(chatRoom->admin, strdup(adminJson->valuestring));
+        strcpy(chatRoom->name, strdup(nameJson->valuestring));
+
+        // Get the number of users
+        chatRoom->userCount = cJSON_GetArraySize(usersJson);
+        chatRoom->users = (User**)malloc(sizeof(User*) * chatRoom->userCount);
+        if (!chatRoom->users) {
+            perror("Memory allocation error");
+            free(chatRoom->admin);
+            free(chatRoom->name);
+            free(chatRoom);
+            cJSON_Delete(json);
+            return NULL;
+        }
+
+        // Populate the users array
+        for (size_t i = 0; i < chatRoom->userCount; i++) {
+            cJSON* userJson = cJSON_GetArrayItem(usersJson, i);
+            chatRoom->users[i] = create_user_from_json(userJson);
+            if (!chatRoom->users[i]) {
+                fprintf(stderr, "Error creating user from JSON\n");
+                for (size_t j = 0; j < i; j++) {
+                    free(chatRoom->users[j]->user);
+                    //free(chatRoom->users[j]->password);
+                    free(chatRoom->users[j]);
+                }
+                free(chatRoom->users);
+                free(chatRoom->admin);
+                free(chatRoom->name);
+                free(chatRoom);
+                cJSON_Delete(json);
+                return NULL;
+            }
+        }
+    } else {
+        fprintf(stderr, "Invalid JSON format\n");
+        free(chatRoom);
+        cJSON_Delete(json);
+        return NULL;
+    }
+
+    // Clean up the cJSON object
+    cJSON_Delete(json);
+
+    return chatRoom;
+}
+
+// Function to free a User structure
+void free_user(User* user) {
+    if (user) {
+        free(user->user);
+        //free(user->password);
+        free(user);
+    }
+}
+
+// Function to free a ChatRoom structure
+void free_chatroom(ChatRoom* chatRoom) {
+    if (chatRoom) {
+        free(chatRoom->admin);
+        free(chatRoom->name);
+        for (size_t i = 0; i < chatRoom->userCount; i++) {
+            free_user(chatRoom->users[i]);
+        }
+        free(chatRoom->users);
+        free(chatRoom);
+    }
+}
   
   
 void send_message(const char* message,const char* user) {
@@ -258,6 +379,64 @@ void broadcast(const char* message, Messages *array) {
     printf("Broadcasting message to all clients: %s\n", message);
     addMessage(array,message);
 }
+
+
+void update_chatroom_users(ChatRoom* chatRoom, const char* jsonString) {
+    // Parse the JSON string
+    cJSON* json = cJSON_Parse(jsonString);
+    if (!json) {
+        fprintf(stderr, "Error parsing JSON: %s\n", cJSON_GetErrorPtr());
+        return ;
+    }
+
+    if (!cJSON_IsArray(json)) {
+        fprintf(stderr, "Expected JSON array\n");
+        cJSON_Delete(json);
+        return ;
+    }
+
+    // Get the number of new users
+    size_t newUserCount = cJSON_GetArraySize(json);
+
+    // Allocate memory for the new users array
+    User** newUsers = (User**)malloc(sizeof(User*) * newUserCount);
+    if (!newUsers) {
+        perror("Memory allocation error");
+        cJSON_Delete(json);
+        return ;
+    }
+
+    // Populate the new users array
+    for (size_t i = 0; i < newUserCount; i++) {
+        cJSON* userJson = cJSON_GetArrayItem(json, i);
+        newUsers[i] = create_user_from_json(userJson);
+        if (!newUsers[i]) {
+            fprintf(stderr, "Error creating user from JSON\n");
+            for (size_t j = 0; j < i; j++) {
+                free_user(newUsers[j]);
+            }
+            free(newUsers);
+            cJSON_Delete(json);
+            return ;
+        }
+    }
+
+    // Free the existing users
+    for (size_t i = 0; i < chatRoom->userCount; i++) {
+        free_user(chatRoom->users[i]);
+    }
+    free(chatRoom->users);
+
+    // Update the chat room with the new users
+    chatRoom->users = newUsers;
+    chatRoom->userCount = newUserCount;
+
+    // Clean up the cJSON object
+    cJSON_Delete(json);
+
+}
+
+
   
 // Driver code 
 int main(){   
@@ -320,7 +499,7 @@ int main(){
 		}
 	    if(strcmp(inst,"DISCONNECT")==0){
 			printf("Desconectando\n");
-        	ans=1;
+        	//ans=1;
 			//disconnectUser(message,username,password, &userCount);
 		}
 		
@@ -331,16 +510,22 @@ int main(){
 			registerUser(message,username,password, &userCount);
 		}
 	    if(strcmp(inst,"CREATE_ROOM")==0){
-		printf("Intentando Register\n");
+			printf("Creando una sala\n");
         	ans=1;
-			registerUser(message,username,password, &userCount);
+        	ChatRoom* newChatRoom;
+        	handle_new_chatroom(message, newChatRoom,&allMessages);
+		}
+	    if(strcmp(inst,"RECEAVED")==0){
+			printf("Broadcasting Chatrooms\n");
+        	ans=1;
+			broadcastChatRooms(&allMessages);
+		}
+	    if(strcmp(inst,"UPDATE_ROOMS")==0){
+			printf("Actualizando los chatrooms\n");
+        	//ans=1;
+			//broadcastChatRooms(&allMessages);
 		}
 		/*
-	    if(strcmp(inst,"REGISTER")==0){
-		printf("Intentando Register\n");
-        	ans=1;
-			registerUser(message,username,password, &userCount);
-		}
 	    if(strcmp(inst,"REGISTER")==0){
 		printf("Intentando Register\n");
         	ans=1;
@@ -406,11 +591,7 @@ char* json_stringify_user(User* user) {
 
 char* json_stringify_chatroom(ChatRoom* chatRoom) {
     cJSON* json = cJSON_CreateObject();
-    cJSON* adminJson = cJSON_CreateObject();
-    cJSON_AddStringToObject(adminJson, "user", chatRoom->admin->user);
-    cJSON_AddStringToObject(adminJson, "password", chatRoom->admin->password);
-    cJSON_AddBoolToObject(adminJson, "isActive", chatRoom->admin->isActive);
-    cJSON_AddItemToObject(json, "admin", adminJson);
+    cJSON_AddStringToObject(json, "admin", chatRoom->admin);
     cJSON_AddStringToObject(json, "name", chatRoom->name);
     cJSON* usersJson = cJSON_CreateArray();
     for (size_t i = 0; i < chatRoom->userCount; i++) {
@@ -430,11 +611,7 @@ char* json_stringify_chatrooms(ChatRoom** chatRooms, size_t chatRoomCount) {
     cJSON* jsonArray = cJSON_CreateArray();
     for (size_t i = 0; i < chatRoomCount; i++) {
         cJSON* chatRoomJson = cJSON_CreateObject();
-        cJSON* adminJson = cJSON_CreateObject();
-        cJSON_AddStringToObject(adminJson, "user", chatRooms[i]->admin->user);
-        cJSON_AddStringToObject(adminJson, "password", chatRooms[i]->admin->password);
-        cJSON_AddBoolToObject(adminJson, "isActive", chatRooms[i]->admin->isActive);
-        cJSON_AddItemToObject(chatRoomJson, "admin", adminJson);
+    	cJSON_AddStringToObject(chatRoomJson, "admin", chatRooms[i]->admin);
         cJSON_AddStringToObject(chatRoomJson, "name", chatRooms[i]->name);
         cJSON* usersJson = cJSON_CreateArray();
         for (size_t j = 0; j < chatRooms[i]->userCount; j++) {

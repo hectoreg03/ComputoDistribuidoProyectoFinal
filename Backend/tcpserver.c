@@ -236,9 +236,8 @@ int main(){
 			exit(1);
 		}
 		printf("Conexiones establecidas\n");
-		pid_t child_pid=0;
-		//child_pid=fork();
-		
+		pid_t child_pid =fork();
+		printf("Conexion numero: %d\n", child_pid);
 		if(child_pid==0){
 			printf("sd_Actual: %d\n",(int)sd_actual );
 			char sigue='S';
@@ -297,7 +296,7 @@ int main(){
 			}
 
 				/* cerrar los dos sockets */
-					close(sd_actual);  
+				close(sd_actual);  
 				close(sd);
 				printf("Conexion cerrada\n");
 				seguirperman=0;
